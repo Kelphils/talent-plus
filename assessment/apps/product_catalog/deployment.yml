@@ -1,0 +1,67 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dev-detail
+  namespace: tplus
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: dev-detail
+  template:
+    metadata:
+      labels:
+        app: dev-detail
+    spec:
+      containers:
+        - name: dev-detail-container
+          image: "public.ecr.aws/u2g6w7p2/eks-workshop-demo/catalog_detail:1.0"
+          imagePullPolicy: Always
+          ports:
+            - name: http
+              containerPort: 3000
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /ping
+              port: 3000
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 1
+            successThreshold: 1
+            failureThreshold: 3
+          readinessProbe:
+            exec:
+              command:
+                - /bin/bash
+                - -c
+                - cat readiness.txt | grep ready
+            initialDelaySeconds: 15
+            periodSeconds: 3
+          env:
+            - name: AWS_XRAY_DAEMON_ADDRESS
+              value: xray-service.default:2000
+          resources:
+            limits:
+              cpu: 500m
+              memory: 512Mi
+            requests:
+              cpu: 200m
+              memory: 512Mi
+
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: dev-product-service
+  namespace: tplus
+  labels:
+    app: dev-product
+spec:
+  type: ClusterIP
+  ports:
+    - port: 3000
+      name: http
+  selector:
+    app: dev-product

@@ -1,5 +1,5 @@
 # Use the official Node.js LTS image as the base image
-FROM node:16 AS build
+FROM node:16
 
 # Set the working directory inside the container
 WORKDIR /app
@@ -13,7 +13,7 @@ RUN npm i
 # Copy the rest of the application files to the container
 COPY . .
 
-# Expose port 80 to the host
+# Expose port 3000 to the host
 EXPOSE 3000
 
 # Start the React app

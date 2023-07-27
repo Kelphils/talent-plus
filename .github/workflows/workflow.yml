@@ -1,0 +1,251 @@
+name: Infrastructure Deployment
+
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+     - master
+     - main
+
+permissions:
+  id-token: write
+  contents: read
+
+
+jobs:
+
+  #----------------------------------------------
+  #-------Setup Infrastructure-------------------
+  #----------------------------------------------
+
+  provision-infrastructure-for-deployment:
+    runs-on: ubuntu-latest
+
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 1
+
+      #----------------------------------------------
+      # ----- Authenticate With AWS Credentials -----
+      #----------------------------------------------
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: eu-north-1
+
+      #----------------------------------------------
+      # --- Setup Terraform with specific version ---
+      #----------------------------------------------
+      - name: Setup Terraform
+        run: |
+          # change directory to /tmp to avoid conflicts with terraform folder containing the infrastruture code
+          cd /tmp
+          sudo apt install wget curl unzip
+          TER_VER=`curl -s https://api.github.com/repos/hashicorp/terraform/releases/latest | grep tag_name | cut -d: -f2 | tr -d \"\,\v | awk '{$1=$1};1'`
+          wget https://releases.hashicorp.com/terraform/${TER_VER}/terraform_${TER_VER}_linux_amd64.zip
+          unzip terraform_${TER_VER}_linux_amd64.zip
+          sudo mv -f terraform /bin/terraform
+        # uses: hashicorp/setup-terraform@v2
+        # with:
+        #   terraform_version: 1.3.7
+        #   terraform_wrapper: false
+
+      - name: Install Aws Cli
+        run: |
+          curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+          unzip awscliv2.zip
+          sudo ./aws/install --bin-dir /usr/local/bin --install-dir /usr/local/aws-cli --update
+
+      - name: View versions of tools
+        run: |
+          echo "Terraform version: $(terraform version)"
+          echo "Aws Cli Version: $(aws --version)"
+    #----------------------------------------------
+    #----  Setup Infrastructure   -----------------
+    #----------------------------------------------
+
+      - name: Terraform init
+        run: |
+          cd terraform
+          terraform init -backend-config=backend.hcl
+      - name: Terraform validate
+        run: |
+          cd terraform
+          terraform validate
+      - name: Terraform plan
+        run: |
+          cd terraform
+          terraform plan
+      - name: Terraform apply 
+        run: |
+          cd terraform
+          terraform apply -target=module.vpc -target=module.dns -target=module.eks -auto-approve
+          sleep 10
+      - name: Terraform Apply -v2
+        run: |
+          cd terraform
+          terraform apply -auto-approve
+          mkdir -p ~/artifact
+          echo $(terraform output --json ecr_repo_urls) > ~/artifact/ecr_repo_url.txt
+          echo $(terraform output --raw kubectl_config) > ~/artifact/kubectl_config.txt
+          cat ~/artifact/ecr_repo_url.txt
+          cat ~/artifact/kubectl_config.txt 
+      - name: Upload artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: repo-artifact
+          path: ~/artifact/*
+
+    #----------------------------------------------
+    #----  Build and Push to ECR   ---------------
+    #----------------------------------------------
+
+  build:
+    
+    name: Build Image
+    runs-on: ubuntu-latest
+    needs: provision-infrastructure-for-deployment
+
+   
+    steps:
+
+    - name: Check out code
+      uses: actions/checkout@v2
+
+      #----------------------------------------------
+      # ----- Authenticate With AWS Credentials -----
+      #----------------------------------------------
+    
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v1
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: eu-north-1
+
+    #----------------------------------------------
+    #      ----- Build, Tag & Push -----
+    #----------------------------------------------
+
+    - name: Download repo artifact
+      uses: actions/download-artifact@v3
+      with:
+        name: repo-artifact
+        path: downloaded-artifact
+
+    - name: Display ecr_repo.txt
+      run: |
+        ls -R downloaded-artifact
+        echo "The contents of the file are: $(cat downloaded-artifact/ecr_repo_url.txt)"
+
+    # Read the output variable
+    - name: Read output variable
+      id: read-output-variable
+      run: |
+        value=$(cat downloaded-artifact/ecr_repo_url.txt)
+        echo "The output value is $value"
+    #----------------------------------------------
+    #      ----- Ecr Login and Push -----
+    #----------------------------------------------
+
+    - name: Login to Amazon ECR
+      id: login-ecr
+      uses: aws-actions/amazon-ecr-login@v1
+
+    # Loop through each ECR URL and build, tag, and push Docker images
+    - name: Build, tag, and push frontend image to Amazon ECR
+      env:
+        ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        ECR_REPOSITORY: talentplus
+        IMAGE_TAG: frontend
+      run: |
+        cd apps/frontend
+        docker build -t "pipeline-frontend" .
+        docker tag "pipeline-frontend" $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+        docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+
+    - name: Build, tag, and push backend image to Amazon ECR
+      env:
+        ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        ECR_REPOSITORY: talentplus
+        IMAGE_TAG: backend
+      run: |
+        cd apps/backend
+        docker build -t "pipeline-backend" .
+        docker tag "pipeline-backend" $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+        docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+
+    #----------------------------------------------
+    #-------   Deployment to EKS -------------------
+    #----------------------------------------------
+
+  deploy:
+    name: Deploy to EKS
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v2
+
+      #----------------------------------------------
+      # ----- Authenticate With AWS Credentials -----
+      #----------------------------------------------
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: eu-north-1
+
+      #----------------------------------------------
+      # ----- Authenticate With EKS Cluster -----
+      #----------------------------------------------
+      - name: Download kubectl artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: repo-artifact
+          path: downloaded-artifact
+
+      - name: Display kubectl_config
+        run: |
+          ls -R downloaded-artifact
+          echo "The contents of the file are: $(cat downloaded-artifact/kubectl_config.txt)"
+          cat downloaded-artifact/kubectl_config.txt > cluster.sh
+          chmod +x cluster.sh
+          ./cluster.sh
+          cat ~/.kube/config | base64 -w0
+
+      - name: Setup Kubectl
+        run: |
+          curl -LO https://dl.k8s.io/release/v1.25.0/bin/linux/amd64/kubectl
+          chmod +x kubectl
+          sudo mv kubectl /usr/local/bin
+          kubectl version -o yaml | grep gitVersion
+          echo "All pods running in the cluster: $(kubectl get po -A)"
+
+      - name: Setup Helm
+        run: |
+          curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3
+          chmod 700 get_helm.sh
+          sudo ./get_helm.sh
+          helm version
+          
+        #----------------------------------------------
+        # ----- Deploy to EKS Cluster using Helm -----
+        #----------------------------------------------
+
+      - name: Deploy Applications
+        run: |
+          echo "Kubectl version: $(kubectl version --client)"
+          kubectl get nodes
+          echo "Deploying apps using helm charts && nothing to do next"
+          # cd helm-charts
+        
+
+

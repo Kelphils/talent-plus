@@ -34,3 +34,9 @@ secrets.auto.tfvars
 .DS_Store
 terraform-log*
 *.tfplan
+
+value.yml
+bash.sh
+ecr_repo_url.txt
+/helm-charts/*
+```

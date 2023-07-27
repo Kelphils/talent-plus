@@ -245,7 +245,7 @@ jobs:
           echo "Kubectl version: $(kubectl version --client)"
           kubectl get nodes
           echo "Deploying apps using helm charts && nothing to do next"
-          # cd helm-charts
+          helm install talentplus-assessment helm-charts/
         
 
 

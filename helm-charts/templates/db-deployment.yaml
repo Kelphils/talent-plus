@@ -1,0 +1,59 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.db.name }}
+  namespace: {{ .Values.namespace.name }}
+  labels:
+    chart: {{ template "helm-charts.chart" . }}
+    release: {{ .Release.Name }}
+    heritage: {{ .Release.Service }}
+spec:
+  replicas: {{ .Values.db.replicaCount }}
+  revisionHistoryLimit: 3
+  selector:
+    matchLabels:
+      app: {{ .Values.db.name }}
+      release: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.db.name }}
+        release: {{ .Release.Name }}
+    spec:
+      containers:
+        - name: "{{ .Values.db.name }}-container"
+          image: "{{ .Values.db.image.repository }}:{{ .Values.db.image.tag }}"
+          imagePullPolicy: {{ .Values.db.image.pullPolicy }}   
+          env:
+            - name: MYSQL_ROOT_PASSWORD
+              value: password
+            - name: MYSQL_USER
+              value: "root"
+            - name: MYSQL_DATABASE
+              value: tableplus 
+          ports:
+            - name: mysql
+              containerPort: {{ .Values.db.service.port }}
+              protocol: TCP
+          volumeMounts:
+            - name: mysql-persistent-storage
+              mountPath: /var/lib/mysql
+              readOnly: false
+          resources:
+{{ toYaml .Values.resources | indent 12 }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+{{ toYaml . | indent 8 }}
+      {{- end }}
+      volumes:
+        - name: mysql-persistent-storage
+          persistentVolumeClaim:
+            claimName: "{{ .Values.db.name }}-pv-claim"
+      {{- with .Values.affinity }}
+        affinity:
+{{ toYaml . | indent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+        tolerations:
+{{ toYaml . | indent 8 }}
+      {{- end }}

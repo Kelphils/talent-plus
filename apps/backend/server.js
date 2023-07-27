@@ -12,7 +12,7 @@ app.use(cors());
 
 // Replace the following connection configuration with your MySQL database settings
 const connection = mysql.createConnection({
-  host: "localhost",
+  host: "mysql-service",
   user: "root",
   password: "password",
 });

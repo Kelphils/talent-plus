@@ -1,0 +1,196 @@
+# Default values for helm-charts.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+namespace: 
+  name: talent-plus-assessment
+
+image:
+  repository: 911072504247.dkr.ecr.eu-north-1.amazonaws.com/talentplus
+
+frontend:
+  replicaCount: 2
+  name: frontend
+
+  image:
+    tag: "frontend"
+    pullPolicy: Always
+
+  service:
+    type: LoadBalancer
+    targetPort: 3000
+    port: 80
+    name: "http"
+
+
+ingress:
+  enabled: false
+  annotations: {}
+    # kubernetes.io/ingress.class: alb
+    # alb.ingress.kubernetes.io/scheme: internet-facing
+    # alb.ingress.kubernetes.io/target-type: ip
+    # alb.ingress.kubernetes.io/healthcheck-protocol: HTTP
+    # alb.ingress.kubernetes.io/healthcheck-port: traffic-port
+    # alb.ingress.kubernetes.io/healthcheck-interval-seconds: '15'
+    # alb.ingress.kubernetes.io/healthcheck-timeout-seconds: '5'
+    # alb.ingress.kubernetes.io/success-codes: '200'
+    # alb.ingress.kubernetes.io/healthy-threshold-count: '2'
+    # alb.ingress.kubernetes.io/unhealthy-threshold-count: '2'
+  rules:
+    - host: ""
+      paths: []
+
+  tls: []
+  #  - secretName: chart-example-tls
+  #    hosts:
+  #      - chart-example.local
+
+  resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 200m
+    memory: 256Mi
+    # We usually recommend not to specify default resources and to leave this as a conscious
+    # choice for the user. This also increases chances charts run on environments with little
+    # resources, such as Minikube. If you do want to specify resources, uncomment the following
+    # lines, adjust them as necessary, and remove the curly braces after 'resources:'.
+    # limits:
+    #   cpu: 100m
+    #   memory: 128Mi
+    # requests:
+    #   cpu: 100m
+  #   memory: 128Mi
+
+backend:
+  replicaCount: 2
+  name: backend
+
+  image:
+    tag: "backend"
+    pullPolicy: Always
+
+  service:
+    type: ClusterIP
+    port: 3001
+
+  ingress:
+    enabled: false
+    annotations: {}
+    # kubernetes.io/ingress.class: alb
+    # alb.ingress.kubernetes.io/scheme: internet-facing
+    # alb.ingress.kubernetes.io/target-type: ip
+    # alb.ingress.kubernetes.io/healthcheck-protocol: HTTP
+    # alb.ingress.kubernetes.io/healthcheck-port: traffic-port
+    # alb.ingress.kubernetes.io/healthcheck-interval-seconds: '15'
+    # alb.ingress.kubernetes.io/healthcheck-timeout-seconds: '5'
+    # alb.ingress.kubernetes.io/success-codes: '200'
+    # alb.ingress.kubernetes.io/healthy-threshold-count: '2'
+    # alb.ingress.kubernetes.io/unhealthy-threshold-count: '2'
+    rules:
+    - host: ""
+      paths: []
+
+    tls: []
+    #  - secretName: chart-example-tls
+    #    hosts:
+    #      - chart-example.local
+
+  resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 200m
+    memory: 256Mi
+  # We usually recommend not to specify default resources and to leave this as a conscious
+  # choice for the user. This also increases chances charts run on environments with little
+  # resources, such as Minikube. If you do want to specify resources, uncomment the following
+  # lines, adjust them as necessary, and remove the curly braces after 'resources:'.
+  # limits:
+  #   cpu: 100m
+  #   memory: 128Mi
+  # requests:
+  #   cpu: 100m
+#   memory: 128Mi
+
+db:
+  name: mysql
+  replicaCount: 1
+
+  service:
+    port: 3306
+
+  image:
+    repository: mysql
+    tag: "latest"
+    pullPolicy: Always
+
+  volumes:
+    - name: mysql-persistent-storage
+      csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+  volumeMounts:
+    - name: mysql-persistent-storage
+      mountPath: /var/lib/mysql
+      readOnly: true
+
+
+serviceAccount:
+  # Specifies whether a service account should be created
+  create: false
+  # Annotations to add to the service account
+  annotations: {}
+  # The name of the service account to use.
+  # If not set and create is true, a name is generated using the fullname template
+  name: ""
+
+ingress:
+  enabled: false
+  #className: "alb"
+  annotations: 
+    #kubernetes.io/ingress.class: alb
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/group.order: '1'
+    alb.ingress.kubernetes.io/healthcheck-protocol: HTTP
+    alb.ingress.kubernetes.io/healthcheck-port: traffic-port
+    alb.ingress.kubernetes.io/healthcheck-interval-seconds: '15'
+    alb.ingress.kubernetes.io/healthcheck-timeout-seconds: '5'
+    alb.ingress.kubernetes.io/success-codes: '200'
+    alb.ingress.kubernetes.io/healthy-threshold-count: '2'
+    alb.ingress.kubernetes.io/unhealthy-threshold-count: '2'
+  host: eks.cgseerapps.com
+  path: /
+  
+  tls: []
+  #  - secretName: chart-example-tls
+  #    hosts:
+  #      - chart-example.local
+
+resources: {}
+  # We usually recommend not to specify default resources and to leave this as a conscious
+  # choice for the user. This also increases chances charts run on environments with little
+  # resources, such as Minikube. If you do want to specify resources, uncomment the following
+  # lines, adjust them as necessary, and remove the curly braces after 'resources:'.
+  # limits:
+  #   cpu: 100m
+  #   memory: 128Mi
+  # requests:
+  #   cpu: 100m
+  #   memory: 128Mi
+
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 100
+  targetCPUUtilizationPercentage: 80
+  # targetMemoryUtilizationPercentage: 80
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}

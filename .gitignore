@@ -38,5 +38,5 @@ terraform-log*
 value.yml
 bash.sh
 ecr_repo_url.txt
-/helm-charts/*
+# /helm-charts/*
 ```

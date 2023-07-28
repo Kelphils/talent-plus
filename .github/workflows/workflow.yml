@@ -347,6 +347,12 @@ jobs:
           chmod 700 get_helm.sh
           sudo ./get_helm.sh
           helm version
+
+      - name: Install Aws Cli
+        run: |
+          curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+          unzip awscliv2.zip
+          sudo ./aws/install --bin-dir /usr/local/bin --install-dir /usr/local/aws-cli --update
           
         #----------------------------------------------
         # ----- Deploy to EKS Cluster using Helm -----
@@ -354,10 +360,42 @@ jobs:
 
       - name: Deploy Applications
         run: |
-          echo "Kubectl version: $(kubectl version --client)"
+          echo "Kubectl version: $(kubectl version --output=yaml)"
           kubectl get nodes
           echo "Deploying apps using helm charts && nothing to do next"
-          # helm upgrade --install talentplus-assessment helm-charts/
-        
+          helm upgrade --install talentplus-assessment helm-chart/
+          sleep 60
+          SERVICE_IP=$(kubectl get svc frontend-external -n talentplus -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
+          echo "The Service External IP is: $SERVICE_IP"
+          echo "SERVICE_IP=$SERVICE_IP" >> $GITHUB_ENV
+
+      - name: Get Hosted Zone ID
+        id: get-hosted-zone-id
+        run: |
+          HOSTED_ZONE_ID=$(aws route53 list-hosted-zones --query "HostedZones[?Name==\`eks.cgseerapps.com.\`].Id" --output text)
+          echo "The Hosted Zone ID is: $HOSTED_ZONE_ID"
+          HOSTED_ZON_ID=${HOSTED_ZONE_ID##*/}  # Remove '/hostedzone/' prefix
+          echo "The Updated Hosted Zone ID is: $HOSTED_ZON_ID"
+          echo "HOSTED_ZON_ID=$HOSTED_ZON_ID" >> $GITHUB_ENV
+
+      # - name: Update Route 53 DNS
+      #   run: |
+      #     aws route53 change-resource-record-sets \
+      #       --hosted-zone-id "$HOSTED_ZON_ID"  --change-batch "{
+      #       \"Changes\": [
+      #         {
+      #           \"Action\": \"UPSERT\",
+      #           \"ResourceRecordSet\": {
+      #             \"Name\": \"eks.cgseerapps.com\",
+      #             \"Type\": \"A\",
+      #             \"AliasTarget\": {
+      #               \"HostedZoneId\": \"$HOSTED_ZON_ID\",
+      #               \"DNSName\": \"$SERVICE_IP\",
+      #               \"EvaluateTargetHealth\": false
+      #             }
+      #           }
+      #         }
+      #       ]
+      #     }"
 
 

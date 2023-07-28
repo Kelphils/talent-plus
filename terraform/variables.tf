@@ -38,7 +38,7 @@ variable "environment" {
 variable "cluster_name" {
   description = "The name of the EKS cluster"
   type        = string
-  default     = "tplus-cluster"
+  default     = "talentplus-cluster"
 }
 
 variable "is_internal" {

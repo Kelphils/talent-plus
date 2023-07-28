@@ -2,8 +2,9 @@
 # This is a YAML-formatted file.
 # Declare variables to be passed into your templates.
 
+
 namespace: 
-  name: talent-plus-assessment
+  name: talent-plus
 
 image:
   repository: 911072504247.dkr.ecr.eu-north-1.amazonaws.com/talentplus
@@ -121,7 +122,8 @@ db:
 
   service:
     port: 3306
-
+  
+  storageClassName: mysql-aws-ebs-storage
   image:
     repository: mysql
     tag: "latest"
@@ -129,9 +131,7 @@ db:
 
   volumes:
     - name: mysql-persistent-storage
-      csi:
-        driver: secrets-store.csi.k8s.io
-        readOnly: true
+
   volumeMounts:
     - name: mysql-persistent-storage
       mountPath: /var/lib/mysql

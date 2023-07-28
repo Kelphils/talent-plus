@@ -8,10 +8,10 @@ metadata:
     release: {{ .Release.Name }}
     heritage: {{ .Release.Service }}
 spec:
-  storageClassName: secrets-store.csi.k8s.io
+  storageClassName: {{.Values.db.storageClassName}}
   accessModes:
     - ReadWriteOnce
   resources:
     requests:
-      storage: 5Gi
+      storage: 10Gi
 

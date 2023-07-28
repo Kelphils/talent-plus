@@ -39,4 +39,5 @@ value.yml
 bash.sh
 ecr_repo_url.txt
 # /helm-charts/*
+test.yaml
 ```

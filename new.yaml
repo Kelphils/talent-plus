@@ -1,0 +1,57 @@
+on:
+  workflow_dispatch:
+  push:
+    branches:
+     - master
+     - main
+
+permissions:
+  id-token: write
+  contents: read
+
+
+jobs:
+
+  build:
+        
+    name: Build Image
+    runs-on: ubuntu-latest
+    needs: provision-infrastructure-for-deployment
+
+
+    steps:
+
+    # Pull, tag, and push Docker images
+    - name: Pull, tag, and push frontend image to Amazon ECR
+      env:
+        ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        ECR_REPOSITORY: talentplus
+        IMAGE_TAG: frontend
+        VERSION: v0.8.0
+      run: |
+        docker pull gcr.io/google-samples/microservices-demo/$IMAGE_TAG:$VERSION
+        docker tag gcr.io/google-samples/microservices-demo/$IMAGE_TAG:$VERSION $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+        docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+
+    - name: Pull, tag, and push adservice image to Amazon ECR
+      env:
+        ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        ECR_REPOSITORY: talentplus
+        IMAGE_TAG: adservice
+        VERSION: v0.8.0
+      run: |
+        docker pull gcr.io/google-samples/microservices-demo/$IMAGE_TAG:$VERSION
+        docker tag gcr.io/google-samples/microservices-demo/$IMAGE_TAG:$VERSION $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+        docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+
+    - name: Pull, tag, and push cartservice image to Amazon ECR
+      env:
+        ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        ECR_REPOSITORY: talentplus
+        IMAGE_TAG: cartservice
+        VERSION: v0.8.0
+      run: |
+        docker pull gcr.io/google-samples/microservices-demo/$IMAGE_TAG:$VERSION
+        docker tag gcr.io/google-samples/microservices-demo/$IMAGE_TAG:$VERSION $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+        docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+  
